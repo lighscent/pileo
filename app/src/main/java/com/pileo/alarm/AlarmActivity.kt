@@ -1,10 +1,15 @@
 package com.pileo.alarm
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +34,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -48,39 +55,79 @@ import kotlin.math.roundToInt
 /** Full-screen alarm UI shown over the lock screen when a reminder fires. */
 class AlarmActivity : ComponentActivity() {
 
+    companion object {
+        /** Envoyé par AlarmActionReceiver pour fermer l'écran quand l'alarme a été traitée. */
+        const val ACTION_DISMISS_UI = "com.pileo.ACTION_DISMISS_UI"
+    }
+
+    private var medId by mutableStateOf(-1L)
+    private var medName by mutableStateOf("Médicament")
+    private var medDosage by mutableStateOf("")
+    private var medTimeLabel by mutableStateOf("")
+    private var notificationId by mutableStateOf(0)
+    private var delayMinutes by mutableIntStateOf(SettingsPrefs.DEFAULT_SNOOZE_MINUTES)
+
+    private val dismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         }
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val medId = intent.getLongExtra(AlarmService.EXTRA_MED_ID, -1L)
-        val name = intent.getStringExtra(AlarmService.EXTRA_NAME) ?: "Médicament"
-        val dosage = intent.getStringExtra(AlarmService.EXTRA_DOSAGE) ?: ""
-        val timeLabel = intent.getStringExtra(AlarmService.EXTRA_TIME_LABEL) ?: ""
-        val nid = intent.getIntExtra(AlarmService.EXTRA_NOTIFICATION_ID, 0)
-        val delay = SettingsPrefs.snoozeMinutes(this)
+        applyExtras(intent)
+        delayMinutes = SettingsPrefs.snoozeMinutes(this)
+        ContextCompat.registerReceiver(
+            this,
+            dismissReceiver,
+            IntentFilter(ACTION_DISMISS_UI),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         setContent {
             PileoTheme {
                 AlarmScreen(
-                    name = name,
-                    dosage = dosage,
-                    timeLabel = timeLabel,
-                    delayMinutes = delay,
+                    name = medName,
+                    dosage = medDosage,
+                    timeLabel = medTimeLabel,
+                    delayMinutes = delayMinutes,
                     onTaken = {
-                        sendAction(NotificationHelper.ACTION_MARK_TAKEN, medId, nid, name, dosage, timeLabel)
+                        sendAction(NotificationHelper.ACTION_MARK_TAKEN, medId, notificationId, medName, medDosage, medTimeLabel)
                         finish()
                     },
                     onSnooze = {
-                        sendAction(NotificationHelper.ACTION_SNOOZE, medId, nid, name, dosage, timeLabel)
+                        sendAction(NotificationHelper.ACTION_SNOOZE, medId, notificationId, medName, medDosage, medTimeLabel)
                         finish()
                     }
                 )
             }
         }
+    }
+
+    /** Relancée par le système alors qu'une instance existe : on met à jour les données affichées. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        applyExtras(intent)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        runCatching { unregisterReceiver(dismissReceiver) }
+    }
+
+    private fun applyExtras(i: Intent?) {
+        medId = i?.getLongExtra(AlarmService.EXTRA_MED_ID, -1L) ?: -1L
+        medName = i?.getStringExtra(AlarmService.EXTRA_NAME) ?: "Médicament"
+        medDosage = i?.getStringExtra(AlarmService.EXTRA_DOSAGE) ?: ""
+        medTimeLabel = i?.getStringExtra(AlarmService.EXTRA_TIME_LABEL) ?: ""
+        notificationId = i?.getIntExtra(AlarmService.EXTRA_NOTIFICATION_ID, 0) ?: 0
     }
 
     private fun sendAction(

@@ -15,29 +15,31 @@ import com.pileo.alarm.AlarmService
 import com.pileo.data.SettingsPrefs
 
 object NotificationHelper {
-    const val CHANNEL_ID = "pileo_reminders"
+    const val CHANNEL_ID = "pileo_alarms"
     const val ACTION_MARK_TAKEN = "com.pileo.ACTION_MARK_TAKEN"
     const val ACTION_SNOOZE = "com.pileo.ACTION_SNOOZE"
+
+    /** Ancien canal créé par une version anglaise : immuable, on le remplace. */
+    private const val LEGACY_CHANNEL_ID = "pileo_reminders"
 
     fun createChannel(ctx: Context) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-                nm.createNotificationChannel(
-                    NotificationChannel(
-                        CHANNEL_ID,
-                        "Alarmes de médicaments",
-                        NotificationManager.IMPORTANCE_HIGH
-                    ).apply {
-                        description = "Alarmes pour prendre vos médicaments"
-                        // Le son est joué par AlarmService sur la voie ALARME :
-                        // le canal doit rester muet pour éviter un double son.
-                        setSound(null, null)
-                        enableVibration(false)
-                        setShowBadge(true)
-                    }
-                )
-            }
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID,
+                    "Alarmes de médicaments",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Alarmes pour prendre vos médicaments"
+                    // Le son est joué par AlarmService sur la voie ALARME :
+                    // le canal doit rester muet pour éviter un double son.
+                    setSound(null, null)
+                    enableVibration(false)
+                    setShowBadge(true)
+                }
+            )
+            nm.deleteNotificationChannel(LEGACY_CHANNEL_ID)
         }
     }
 

@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.pileo.MainActivity
 import com.pileo.data.Medication
 import java.util.Calendar
 
@@ -66,7 +67,7 @@ class AlarmScheduler(private val ctx: Context) {
                 )
                 try {
                     if (canExact) {
-                        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                        am.setAlarmClock(alarmClockInfo(triggerAt), pi)
                     } else {
                         am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
                     }
@@ -127,7 +128,7 @@ class AlarmScheduler(private val ctx: Context) {
         )
         val am = alarmManager()
         try {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
+            am.setAlarmClock(alarmClockInfo(fireAt), pi)
         } catch (_: SecurityException) {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
         }
@@ -153,17 +154,33 @@ class AlarmScheduler(private val ctx: Context) {
             set(Calendar.MILLISECOND, 0)
         }
         // Calendar week starts Sunday; ensure we land in the future.
-        // If computed time is before now (with 60s grace), push by weeks until future.
+        // Only a slot already past is pushed a week; a slot a few seconds ahead must still
+        // fire today (sinon un rappel réglé juste avant son heure était reporté d'une semaine).
         var guard = 0
-        while ((t.timeInMillis <= now.timeInMillis + 60_000) && guard < 3) {
+        while (t.timeInMillis <= now.timeInMillis && guard < 3) {
             t.add(Calendar.DAY_OF_YEAR, 7)
             guard++
         }
-        // Edge: DAY_OF_WEEK set can land in the past week already; if still past, add a week.
-        // The loop above covers it, but if t is >7 days past (shouldn't happen), keep adding.
-        while (t.timeInMillis <= now.timeInMillis + 60_000) {
+        while (t.timeInMillis <= now.timeInMillis) {
             t.add(Calendar.DAY_OF_YEAR, 7)
+        }
+        // Créneau imminent : le garder aujourd'hui avec une petite marge de sécurité.
+        if (t.timeInMillis - now.timeInMillis < 5_000) {
+            return now.timeInMillis + 5_000
         }
         return t.timeInMillis
     }
+
+    /** Le système traite ces alarmes comme de vraies alarmes (icône, réveil, hors Doze). */
+    private fun alarmClockInfo(triggerAt: Long): AlarmManager.AlarmClockInfo =
+        AlarmManager.AlarmClockInfo(
+            triggerAt,
+            PendingIntent.getActivity(
+                ctx, 0,
+                Intent(ctx, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
 }

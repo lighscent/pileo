@@ -38,5 +38,9 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 }
             )
         } catch (_: Exception) { }
+        // Ferme aussi l'écran d'alarme s'il est affiché.
+        context.sendBroadcast(
+            Intent(AlarmActivity.ACTION_DISMISS_UI).setPackage(context.packageName)
+        )
     }
 }
