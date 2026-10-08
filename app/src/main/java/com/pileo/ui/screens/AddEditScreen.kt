@@ -74,6 +74,7 @@ fun AddEditScreen(
     var isActive by remember { mutableStateOf(true) }
     var dayPreset by remember { mutableStateOf("Quotidien") }
     var confirmDelete by remember { mutableStateOf(false) }
+    var keptPausedUntil by remember { mutableStateOf(0L) }
     val times = remember { mutableStateListOf<Int>() }
     val days = remember { mutableStateListOf<Int>() }
 
@@ -105,6 +106,7 @@ fun AddEditScreen(
                 dosage = m.dosage
                 notes = m.notes
                 isActive = m.isActive
+                keptPausedUntil = m.pausedUntil
                 times.clear(); times.addAll(m.timesMinutes.sorted())
                 days.clear(); days.addAll(m.daysOfWeek)
             } else {
@@ -252,7 +254,8 @@ fun AddEditScreen(
                             notes = notes.trim(),
                             timesMinutes = times.sorted(),
                             daysOfWeek = days.toSet(),
-                            isActive = isActive
+                            isActive = isActive,
+                            pausedUntil = keptPausedUntil
                         )
                         vm.save(med) { onDone() }
                     }

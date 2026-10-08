@@ -50,6 +50,8 @@ class AlarmScheduler(private val ctx: Context) {
         med.timesMinutes.sorted().forEachIndexed { timeIndex, minutes ->
             med.daysOfWeek.forEach { day ->
                 val triggerAt = nextTriggerMillis(day, minutes)
+                // Occurrence mise en pause : on ne la programme pas, les suivantes restent actives.
+                if (triggerAt <= med.pausedUntil) return@forEach
                 val nid = notificationId(med.id, day, timeIndex)
                 val intent = Intent(ctx, MedicationAlarmReceiver::class.java).apply {
                     action = ACTION_REMIND
@@ -100,6 +102,19 @@ class AlarmScheduler(private val ctx: Context) {
 
     fun scheduleAll(meds: List<Medication>) {
         meds.forEach { schedule(it) }
+    }
+
+    /** Prochain déclenchement programmé pour ce rappel (toutes combinaisons jour × heure), ou null. */
+    fun nextUpcomingTrigger(med: Medication): Long? {
+        if (!med.isActive || med.timesMinutes.isEmpty() || med.daysOfWeek.isEmpty()) return null
+        var best: Long? = null
+        med.timesMinutes.forEach { minutes ->
+            med.daysOfWeek.forEach { day ->
+                val t = nextTriggerMillis(day, minutes)
+                if (best == null || t < best!!) best = t
+            }
+        }
+        return best
     }
 
     /** One-shot alarm fired `delayMinutes` from now, used by "Rappeler plus tard". */

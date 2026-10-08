@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -22,14 +25,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.pileo.data.Medication
 import com.pileo.ui.PileoViewModel
@@ -130,7 +138,9 @@ fun HomeScreen(
                         MedicationRow(
                             med = med,
                             onClick = { onEdit(med.id) },
-                            onToggle = { vm.toggleActive(med, it) }
+                            onToggle = { vm.toggleActive(med, it) },
+                            onPauseNext = { vm.pauseNext(med) },
+                            onResume = { vm.resume(med) }
                         )
                     }
                 }
@@ -143,8 +153,12 @@ fun HomeScreen(
 private fun MedicationRow(
     med: Medication,
     onClick: () -> Unit,
-    onToggle: (Boolean) -> Unit
+    onToggle: (Boolean) -> Unit,
+    onPauseNext: () -> Unit,
+    onResume: () -> Unit
 ) {
+    val paused = med.pausedUntil > System.currentTimeMillis()
+    var showDisableDialog by remember(med.id) { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -162,8 +176,99 @@ private fun MedicationRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (paused) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Prochaine sonnerie en pause (jusqu'à ${formatPauseUntil(med.pausedUntil)}).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
-            Switch(checked = med.isActive, onCheckedChange = onToggle)
+            // En pause : le slider passe en jaune avec une lune à gauche (position OFF).
+            // Plus de bouton au-dessus : un appui dessus propose reprendre / tout désactiver.
+            val baseSwitchColors = SwitchDefaults.colors()
+            Switch(
+                checked = med.isActive && !paused,
+                onCheckedChange = { checked ->
+                    if (!med.isActive) {
+                        if (checked) onToggle(true)
+                    } else if (paused) {
+                        showDisableDialog = true
+                    } else if (!checked) {
+                        // Par défaut le switch met en pause au lieu de désactiver.
+                        onPauseNext()
+                    }
+                },
+                thumbContent = {
+                    if (paused) {
+                        Icon(
+                            imageVector = Icons.Default.DarkMode,
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                            tint = Color(0xFF5C6B73)
+                        )
+                    }
+                },
+                colors = if (paused) {
+                    baseSwitchColors.copy(
+                        uncheckedTrackColor = Color(0xFFF2C14E),
+                        uncheckedThumbColor = Color.White,
+                        uncheckedBorderColor = Color.Transparent
+                    )
+                } else {
+                    baseSwitchColors
+                }
+            )
         }
+    }
+
+    if (showDisableDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisableDialog = false },
+            title = { Text("Rappel en pause") },
+            text = {
+                Text(
+                    "« ${med.name} » ne sonnera pas à la prochaine heure, " +
+                        "puis reprendra normalement. " +
+                        "Vous pouvez aussi le désactiver complètement."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDisableDialog = false
+                        onResume()
+                    }
+                ) { Text("Reprendre") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showDisableDialog = false }) {
+                        Text("Garder la pause")
+                    }
+                    TextButton(
+                        onClick = {
+                            showDisableDialog = false
+                            onToggle(false)
+                        }
+                    ) {
+                        Text(
+                            "Tout désactiver",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        )
+    }
+}
+
+private fun formatPauseUntil(pausedUntil: Long): String {
+    return try {
+        val sdf = java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.FRENCH)
+        sdf.format(java.util.Date(pausedUntil - 60_000L))
+    } catch (_: Exception) {
+        ""
     }
 }

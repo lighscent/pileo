@@ -25,6 +25,16 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                 val dao = PileoDatabase.getInstance(context).medicationDao()
                 val med = dao.getById(medId)
                 if (med != null && med.isActive) {
+                    val now = System.currentTimeMillis()
+                    if (now < med.pausedUntil) {
+                        // Occurrence mise en pause : on ne sonne pas, le cycle suivant reste programmé.
+                        AlarmScheduler(context).schedule(med)
+                        return@launch
+                    }
+                    // Nettoyage : une pause expirée ne doit plus s'afficher.
+                    if (med.pausedUntil != 0L) {
+                        dao.update(med.copy(pausedUntil = 0L))
+                    }
                     val serviceIntent = Intent(context, AlarmService::class.java).apply {
                         putExtra(AlarmService.EXTRA_MED_ID, medId)
                         putExtra(AlarmService.EXTRA_NAME, name)

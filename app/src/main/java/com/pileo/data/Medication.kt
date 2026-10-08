@@ -1,5 +1,6 @@
 package com.pileo.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
@@ -15,6 +16,8 @@ data class Medication(
     /** java.time.DayOfWeek values 1 (Mon) .. 7 (Sun). Empty = never; UI defaults to all 7. */
     val daysOfWeek: Set<Int> = (1..7).toSet(),
     val isActive: Boolean = true,
+    /** Prochaine sonnerie mise en pause : aucune alarme ne sonne tant que now < pausedUntil. 0 = pas de pause. */
+    @ColumnInfo(defaultValue = "0") val pausedUntil: Long = 0L,
     val createdAt: Long = System.currentTimeMillis()
 )
 
