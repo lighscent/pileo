@@ -18,8 +18,6 @@ data class Medication(
     val isActive: Boolean = true,
     /** Prochaine sonnerie mise en pause : aucune alarme ne sonne tant que now < pausedUntil. 0 = pas de pause. */
     @ColumnInfo(defaultValue = "0") val pausedUntil: Long = 0L,
-    /** Mode silencieux : pas de sonnerie ni d'écran d'alarme, notification persistante jusqu'à validation. */
-    @ColumnInfo(defaultValue = "0") val silent: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
 

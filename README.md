@@ -5,14 +5,13 @@ Jetpack Compose app to set pill reminders by days / hours.
 ## Features
 - Pills list with name, dosage, times, days, on/off switch
 - Add / edit: name*, dosage, notes, multiple times per day (time picker),
-  days Mon–Sun + shortcuts Daily / Weekdays / Weekend, active toggle,
-  **silent mode** toggle (persistent notification, no sound)
+  days Mon–Sun + shortcuts Daily / Weekdays / Weekend, active toggle
 - Ring mode: exact alarms (`AlarmManager.setAlarmClock`, weekly cadence)
   + foreground service (alarm-stream sound + vibration)
   + full-screen alarm UI (validate button + swipe-up to snooze)
   + high-priority notification with **J'ai pris** and **Rappeler** actions
-- Silent mode: no sound/vibration/full-screen UI — persistent (ongoing)
-  notification until the dose is validated or snoozed
+- Silent mode (global switch in Settings): no sound/vibration/full-screen UI —
+  persistent (ongoing) notification until the dose is validated or snoozed
 - Pause: switch OFF pauses only the next ring (yellow moon slider),
   following cycle resumes normally; tap again for full disable
 - Snooze delay configurable in Settings (5/10/15/20/30/60 min, default 15)

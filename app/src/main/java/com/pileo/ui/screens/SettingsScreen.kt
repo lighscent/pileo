@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -24,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,7 @@ import com.pileo.data.SettingsPrefs
 fun SettingsScreen(onBack: () -> Unit) {
     val ctx = LocalContext.current
     var snooze by remember { mutableStateOf(SettingsPrefs.snoozeMinutes(ctx)) }
+    var silentMode by remember { mutableStateOf(SettingsPrefs.isSilentMode(ctx)) }
 
     Scaffold(
         topBar = {
@@ -69,6 +73,26 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(8.dp))
+
+            Text("Mode silencieux", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "Notifications persistantes, sans son ni écran d'alarme.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = silentMode,
+                    onCheckedChange = {
+                        silentMode = it
+                        SettingsPrefs.setSilentMode(ctx, it)
+                    }
+                )
+            }
         }
     }
 }
