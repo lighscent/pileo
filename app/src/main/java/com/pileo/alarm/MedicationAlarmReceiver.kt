@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.pileo.data.PileoDatabase
+import com.pileo.notification.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,6 +35,12 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                     // Nettoyage : une pause expirée ne doit plus s'afficher.
                     if (med.pausedUntil != 0L) {
                         dao.update(med.copy(pausedUntil = 0L))
+                    }
+                    if (med.silent) {
+                        // Mode silencieux : notification persistante, sans sonnerie ni écran d'alarme.
+                        NotificationHelper.showSilentReminder(context, nid, medId, name, dosage, timeLabel)
+                        AlarmScheduler(context).schedule(med)
+                        return@launch
                     }
                     val serviceIntent = Intent(context, AlarmService::class.java).apply {
                         putExtra(AlarmService.EXTRA_MED_ID, medId)

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.pileo.MainActivity
 import com.pileo.alarm.AlarmActivity
 import com.pileo.alarm.AlarmScheduler
 import com.pileo.alarm.AlarmActionReceiver
@@ -99,6 +100,63 @@ object NotificationHelper {
                 snoozePi
             )
             .build()
+    }
+
+    /**
+     * Rappel silencieux : notification persistante (ni son, ni vibration, ni plein écran).
+     * Elle reste affichée jusqu'à ce que la prise soit validée (« J'ai pris »)
+     * ou reportée (« Rappeler dans X min »).
+     */
+    fun showSilentReminder(
+        ctx: Context,
+        notificationId: Int,
+        medId: Long,
+        name: String,
+        dosage: String,
+        timeLabel: String
+    ) {
+        createChannel(ctx)
+
+        val contentIntent = Intent(ctx, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val contentPi = PendingIntent.getActivity(
+            ctx, notificationId,
+            contentIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val snoozeMinutes = SettingsPrefs.snoozeMinutes(ctx)
+
+        val takenPi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_MARK_TAKEN)
+        val snoozePi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_SNOOZE)
+
+        val detail = buildString {
+            append(name)
+            if (dosage.isNotBlank()) append(" — ").append(dosage)
+        }
+
+        val notif = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle("Rappel : $name")
+            .setContentText(if (timeLabel.isNotBlank()) "$detail • $timeLabel" else detail)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$detail\nPrévu : $timeLabel"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setContentIntent(contentPi)
+            .addAction(android.R.drawable.checkbox_on_background, "J'ai pris", takenPi)
+            .addAction(
+                android.R.drawable.ic_menu_recent_history,
+                "Rappeler dans $snoozeMinutes min",
+                snoozePi
+            )
+            .build()
+
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(notificationId, notif)
     }
 
     private fun actionPi(

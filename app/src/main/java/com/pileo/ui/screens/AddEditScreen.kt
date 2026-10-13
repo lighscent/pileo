@@ -72,6 +72,7 @@ fun AddEditScreen(
     var dosage by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var isActive by remember { mutableStateOf(true) }
+    var silent by remember { mutableStateOf(false) }
     var dayPreset by remember { mutableStateOf("Quotidien") }
     var confirmDelete by remember { mutableStateOf(false) }
     var keptPausedUntil by remember { mutableStateOf(0L) }
@@ -106,6 +107,7 @@ fun AddEditScreen(
                 dosage = m.dosage
                 notes = m.notes
                 isActive = m.isActive
+                silent = m.silent
                 keptPausedUntil = m.pausedUntil
                 times.clear(); times.addAll(m.timesMinutes.sorted())
                 days.clear(); days.addAll(m.daysOfWeek)
@@ -243,6 +245,22 @@ fun AddEditScreen(
                 Switch(checked = isActive, onCheckedChange = { isActive = it })
             }
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Mode silencieux")
+                    Text(
+                        "Notification persistante, sans son ni écran d'alarme.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = silent, onCheckedChange = { silent = it })
+            }
+
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
@@ -255,6 +273,7 @@ fun AddEditScreen(
                             timesMinutes = times.sorted(),
                             daysOfWeek = days.toSet(),
                             isActive = isActive,
+                            silent = silent,
                             pausedUntil = keptPausedUntil
                         )
                         vm.save(med) { onDone() }
