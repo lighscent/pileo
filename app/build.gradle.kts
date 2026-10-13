@@ -4,6 +4,8 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.pileo"
     compileSdk = 34
@@ -23,6 +25,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val localProps = Properties().apply {
+                rootProject.file("local.properties").inputStream().use(::load)
+            }
+            signingConfig = signingConfigs.maybeCreate("release").apply {
+                storeFile = rootProject.file(localProps.getProperty("release.store.file", "release.keystore"))
+                storePassword = localProps.getProperty("release.store.password")
+                keyAlias = localProps.getProperty("release.key.alias")
+                keyPassword = localProps.getProperty("release.key.password")
+            }
         }
         debug {
             applicationIdSuffix = ".debug"

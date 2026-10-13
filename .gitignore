@@ -10,3 +10,5 @@ captures/
 .cxx/
 *.apk
 !app/build/outputs/apk/debug/*.apk
+*.jks
+*.keystore
