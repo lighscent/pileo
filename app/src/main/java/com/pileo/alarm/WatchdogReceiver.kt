@@ -34,6 +34,7 @@ suspend fun rescheduleAllAlarms(context: Context) {
  */
 class WatchdogReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != ACTION_WATCHDOG) return
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -47,13 +48,16 @@ class WatchdogReceiver : BroadcastReceiver() {
 
     companion object {
         private const val REQUEST_CODE = 999_888
+        private const val ACTION_WATCHDOG = "com.pileo.ACTION_WATCHDOG"
 
         fun scheduleDaily(context: Context) {
             val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val pi = PendingIntent.getBroadcast(
                 context,
                 REQUEST_CODE,
-                Intent(context, WatchdogReceiver::class.java),
+                Intent(context, WatchdogReceiver::class.java).apply {
+                    action = ACTION_WATCHDOG
+                },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             am.setInexactRepeating(

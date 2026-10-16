@@ -17,6 +17,13 @@ import kotlinx.coroutines.launch
  */
 class AlarmActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Ne jamais couper une sonnerie en cours pour un intent inattendu :
+        // seules les deux actions des boutons de notification sont traitées.
+        val action = intent.action
+        if (action != NotificationHelper.ACTION_MARK_TAKEN &&
+            action != NotificationHelper.ACTION_SNOOZE
+        ) return
+
         val medId = intent.getLongExtra(AlarmScheduler.EXTRA_MED_ID, -1L)
         val nid = intent.getIntExtra(AlarmScheduler.EXTRA_NOTIFICATION_ID, 0)
         val name = intent.getStringExtra(AlarmScheduler.EXTRA_NAME) ?: "Médicament"

@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 
 class MedicationAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Le scheduler pose toujours ACTION_REMIND : ignore tout autre intent.
+        if (intent.action != AlarmScheduler.ACTION_REMIND) return
         val medId = intent.getLongExtra(AlarmScheduler.EXTRA_MED_ID, -1L)
         if (medId == -1L) return
 
