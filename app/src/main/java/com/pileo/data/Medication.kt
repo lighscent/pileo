@@ -18,6 +18,12 @@ data class Medication(
     val isActive: Boolean = true,
     /** Prochaine sonnerie mise en pause : aucune alarme ne sonne tant que now < pausedUntil. 0 = pas de pause. */
     @ColumnInfo(defaultValue = "0") val pausedUntil: Long = 0L,
+    /**
+     * Prises liées : délais en minutes après la validation de la prise précédente.
+     * La prise 1 sonne à l'heure programmée ; la prise N+1 sonne delays[N-1] minutes
+     * après la validation de la prise N. Max 4 (prises 2 à 5). L'ordre compte.
+     */
+    @ColumnInfo(defaultValue = "''") val chainDelaysMinutes: List<Int> = emptyList(),
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -29,7 +35,9 @@ class Converters {
     @TypeConverter
     fun toIntList(v: String?): List<Int> {
         if (v.isNullOrBlank()) return emptyList()
-        return v.split(",").mapNotNull { it.trim().toIntOrNull() }.sorted()
+        // Pas de tri ici : l'ordre compte pour les prises liées.
+        // Les heures programmées sont triées par les appelants (formatTimes, schedule…).
+        return v.split(",").mapNotNull { it.trim().toIntOrNull() }
     }
 
     @TypeConverter

@@ -12,3 +12,4 @@ captures/
 !app/build/outputs/apk/debug/*.apk
 *.jks
 *.keystore
+apk

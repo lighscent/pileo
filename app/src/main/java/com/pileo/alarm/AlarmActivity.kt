@@ -66,6 +66,8 @@ class AlarmActivity : ComponentActivity() {
     private var medTimeLabel by mutableStateOf("")
     private var notificationId by mutableStateOf(0)
     private var delayMinutes by mutableIntStateOf(SettingsPrefs.DEFAULT_SNOOZE_MINUTES)
+    private var chainId by mutableStateOf(0L)
+    private var doseNumber by mutableIntStateOf(1)
 
     private val dismissReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -97,12 +99,13 @@ class AlarmActivity : ComponentActivity() {
                     dosage = medDosage,
                     timeLabel = medTimeLabel,
                     delayMinutes = delayMinutes,
+                    doseNumber = doseNumber,
                     onTaken = {
-                        sendAction(NotificationHelper.ACTION_MARK_TAKEN, medId, notificationId, medName, medDosage, medTimeLabel)
+                        sendAction(NotificationHelper.ACTION_MARK_TAKEN, medId, notificationId, medName, medDosage, medTimeLabel, chainId, doseNumber)
                         finish()
                     },
                     onSnooze = {
-                        sendAction(NotificationHelper.ACTION_SNOOZE, medId, notificationId, medName, medDosage, medTimeLabel)
+                        sendAction(NotificationHelper.ACTION_SNOOZE, medId, notificationId, medName, medDosage, medTimeLabel, chainId, doseNumber)
                         finish()
                     }
                 )
@@ -128,11 +131,14 @@ class AlarmActivity : ComponentActivity() {
         medDosage = i?.getStringExtra(AlarmService.EXTRA_DOSAGE) ?: ""
         medTimeLabel = i?.getStringExtra(AlarmService.EXTRA_TIME_LABEL) ?: ""
         notificationId = i?.getIntExtra(AlarmService.EXTRA_NOTIFICATION_ID, 0) ?: 0
+        chainId = i?.getLongExtra(AlarmScheduler.EXTRA_CHAIN_ID, 0L) ?: 0L
+        doseNumber = i?.getIntExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, 1) ?: 1
     }
 
     private fun sendAction(
         action: String, medId: Long, nid: Int,
-        name: String, dosage: String, timeLabel: String
+        name: String, dosage: String, timeLabel: String,
+        chainId: Long, doseNumber: Int
     ) {
         val i = Intent(this, AlarmActionReceiver::class.java).apply {
             this.action = action
@@ -141,6 +147,8 @@ class AlarmActivity : ComponentActivity() {
             putExtra(AlarmScheduler.EXTRA_NAME, name)
             putExtra(AlarmScheduler.EXTRA_DOSAGE, dosage)
             putExtra(AlarmScheduler.EXTRA_TIME_LABEL, timeLabel)
+            putExtra(AlarmScheduler.EXTRA_CHAIN_ID, chainId)
+            putExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, doseNumber)
         }
         sendBroadcast(i)
     }
@@ -152,6 +160,7 @@ private fun AlarmScreen(
     dosage: String,
     timeLabel: String,
     delayMinutes: Int,
+    doseNumber: Int,
     onTaken: () -> Unit,
     onSnooze: () -> Unit
 ) {
@@ -189,6 +198,16 @@ private fun AlarmScreen(
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(20.dp))
+                if (doseNumber >= 2) {
+                    Text(
+                        "Prise $doseNumber",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00838F),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
                 Text(
                     name,
                     style = MaterialTheme.typography.headlineMedium,

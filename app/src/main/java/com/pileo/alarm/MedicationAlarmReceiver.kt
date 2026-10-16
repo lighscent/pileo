@@ -20,11 +20,18 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
         val dosage = intent.getStringExtra(AlarmScheduler.EXTRA_DOSAGE) ?: ""
         val timeLabel = intent.getStringExtra(AlarmScheduler.EXTRA_TIME_LABEL) ?: ""
         val nid = intent.getIntExtra(AlarmScheduler.EXTRA_NOTIFICATION_ID, medId.toInt())
+        val chainId = intent.getLongExtra(AlarmScheduler.EXTRA_CHAIN_ID, 0L)
+        val doseNumber = intent.getIntExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, 1)
 
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val dao = PileoDatabase.getInstance(context).medicationDao()
+                val db = PileoDatabase.getInstance(context)
+                val dao = db.medicationDao()
+                if (chainId != 0L) {
+                    ringChainedDose(context, db, medId, chainId, doseNumber, name, dosage, nid)
+                    return@launch
+                }
                 val med = dao.getById(medId)
                 if (med != null && med.isActive) {
                     val now = System.currentTimeMillis()
@@ -58,5 +65,48 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
+    }
+
+    /**
+     * Sonnerie d'une prise liée : pas de cycle hebdo à reprogrammer
+     * (la suite de la chaîne avance à chaque validation).
+     * La pause ne s'y applique pas (elle ne vise que la prochaine heure programmée),
+     * mais un rappel désactivé annule la chaîne en attente.
+     */
+    private suspend fun ringChainedDose(
+        context: Context,
+        db: PileoDatabase,
+        medId: Long,
+        chainId: Long,
+        doseNumber: Int,
+        name: String,
+        dosage: String,
+        nid: Int
+    ) {
+        val chainDao = db.chainedDoseDao()
+        val chain = chainDao.getById(chainId)
+        if (chain == null || chain.takenAt != 0L) return
+        val med = db.medicationDao().getById(medId)
+        if (med == null || !med.isActive) {
+            chainDao.deleteById(chainId)
+            return
+        }
+        if (SettingsPrefs.isSilentMode(context)) {
+            NotificationHelper.showSilentReminder(
+                context, nid, medId, name, dosage, "",
+                chainId = chainId, doseNumber = doseNumber
+            )
+            return
+        }
+        val serviceIntent = Intent(context, AlarmService::class.java).apply {
+            putExtra(AlarmService.EXTRA_MED_ID, medId)
+            putExtra(AlarmService.EXTRA_NAME, name)
+            putExtra(AlarmService.EXTRA_DOSAGE, dosage)
+            putExtra(AlarmService.EXTRA_TIME_LABEL, "")
+            putExtra(AlarmService.EXTRA_NOTIFICATION_ID, nid)
+            putExtra(AlarmScheduler.EXTRA_CHAIN_ID, chainId)
+            putExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, doseNumber)
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -51,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.pileo.data.Medication
 import com.pileo.ui.PileoViewModel
@@ -77,6 +79,8 @@ fun AddEditScreen(
     var keptPausedUntil by remember { mutableStateOf(0L) }
     val times = remember { mutableStateListOf<Int>() }
     val days = remember { mutableStateListOf<Int>() }
+    /** Délais en minutes après validation de la prise précédente (prise 2, 3, 4, 5 max). */
+    val chains = remember { mutableStateListOf<Int>() }
 
     fun presetFor(d: List<Int>): String {
         val s = d.toSet()
@@ -109,6 +113,7 @@ fun AddEditScreen(
                 keptPausedUntil = m.pausedUntil
                 times.clear(); times.addAll(m.timesMinutes.sorted())
                 days.clear(); days.addAll(m.daysOfWeek)
+                chains.clear(); chains.addAll(m.chainDelaysMinutes.take(4))
             } else {
                 days.clear(); days.addAll((1..7).toList())
             }
@@ -130,7 +135,8 @@ fun AddEditScreen(
     }
 
     val isEditing = medId != null && medId != 0L
-    val valid = name.isNotBlank() && times.isNotEmpty() && days.isNotEmpty()
+    val valid = name.isNotBlank() && times.isNotEmpty() && days.isNotEmpty() &&
+        chains.all { it >= 1 }
 
     fun showTimePicker(initial: Int? = null) {
         val cal = Calendar.getInstance()
@@ -243,6 +249,53 @@ fun AddEditScreen(
                 Switch(checked = isActive, onCheckedChange = { isActive = it })
             }
 
+            Text("Prises liées (jusqu'à 4, facultatif)")
+            Text(
+                "Après chaque validation, la prise suivante sonne X temps après " +
+                    "(ex. une 2e prise 4h après).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            chains.forEachIndexed { i, d ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Prise ${i + 2}", modifier = Modifier.weight(1f))
+                    OutlinedTextField(
+                        value = (d / 60).toString(),
+                        onValueChange = {
+                            val h = it.toIntOrNull()?.coerceIn(0, 72) ?: 0
+                            chains[i] = h * 60 + (d % 60)
+                        },
+                        label = { Text("h") },
+                        modifier = Modifier.size(84.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = (d % 60).toString(),
+                        onValueChange = {
+                            val m = it.toIntOrNull()?.coerceIn(0, 59) ?: 0
+                            chains[i] = (d / 60) * 60 + m
+                        },
+                        label = { Text("min") },
+                        modifier = Modifier.size(84.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    IconButton(onClick = { chains.removeAt(i) }) {
+                        Icon(Icons.Default.Close, contentDescription = "Retirer la prise ${i + 2}")
+                    }
+                }
+            }
+            if (chains.size < 4) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { chains.add(240) }) { Text("Ajouter une prise liée") }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
@@ -255,7 +308,8 @@ fun AddEditScreen(
                             timesMinutes = times.sorted(),
                             daysOfWeek = days.toSet(),
                             isActive = isActive,
-                            pausedUntil = keptPausedUntil
+                            pausedUntil = keptPausedUntil,
+                            chainDelaysMinutes = chains.toList()
                         )
                         vm.save(med) { onDone() }
                     }
@@ -282,7 +336,7 @@ fun AddEditScreen(
             }
 
             if (!valid) {
-                Text("Saisissez un nom, au moins une heure et un jour pour enregistrer.")
+                Text("Saisissez un nom, au moins une heure et un jour pour enregistrer. Chaque prise liée doit durer au moins 1 minute.")
             }
         }
     }

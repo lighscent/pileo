@@ -54,9 +54,11 @@ class AlarmService : Service() {
         val dosage = i.getStringExtra(EXTRA_DOSAGE) ?: ""
         val timeLabel = i.getStringExtra(EXTRA_TIME_LABEL) ?: ""
         val nid = i.getIntExtra(EXTRA_NOTIFICATION_ID, medId.toInt())
+        val chainId = i.getLongExtra(AlarmScheduler.EXTRA_CHAIN_ID, 0L)
+        val doseNumber = i.getIntExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, 1)
 
         val notif = NotificationHelper.buildAlarmNotification(
-            this, nid, medId, name, dosage, timeLabel
+            this, nid, medId, name, dosage, timeLabel, chainId, doseNumber
         )
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK

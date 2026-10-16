@@ -50,7 +50,9 @@ object NotificationHelper {
         medId: Long,
         name: String,
         dosage: String,
-        timeLabel: String
+        timeLabel: String,
+        chainId: Long = 0L,
+        doseNumber: Int = 1
     ): Notification {
         createChannel(ctx)
 
@@ -64,6 +66,8 @@ object NotificationHelper {
             putExtra(AlarmService.EXTRA_DOSAGE, dosage)
             putExtra(AlarmService.EXTRA_TIME_LABEL, timeLabel)
             putExtra(AlarmService.EXTRA_NOTIFICATION_ID, notificationId)
+            putExtra(AlarmScheduler.EXTRA_CHAIN_ID, chainId)
+            putExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, doseNumber)
         }
         val fullPi = PendingIntent.getActivity(
             ctx, notificationId,
@@ -73,10 +77,12 @@ object NotificationHelper {
 
         val snoozeMinutes = SettingsPrefs.snoozeMinutes(ctx)
 
-        val takenPi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_MARK_TAKEN)
-        val snoozePi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_SNOOZE)
+        val takenPi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_MARK_TAKEN, chainId, doseNumber)
+        val snoozePi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_SNOOZE, chainId, doseNumber)
 
         val detail = buildString {
+            // Prise liée : on affiche son numéro (« Prise 2 • Doliprane — 500mg »).
+            if (doseNumber >= 2) append("Prise $doseNumber • ")
             append(name)
             if (dosage.isNotBlank()) append(" — ").append(dosage)
         }
@@ -113,7 +119,9 @@ object NotificationHelper {
         medId: Long,
         name: String,
         dosage: String,
-        timeLabel: String
+        timeLabel: String,
+        chainId: Long = 0L,
+        doseNumber: Int = 1
     ) {
         createChannel(ctx)
 
@@ -128,10 +136,11 @@ object NotificationHelper {
 
         val snoozeMinutes = SettingsPrefs.snoozeMinutes(ctx)
 
-        val takenPi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_MARK_TAKEN)
-        val snoozePi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_SNOOZE)
+        val takenPi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_MARK_TAKEN, chainId, doseNumber)
+        val snoozePi = actionPi(ctx, notificationId, medId, name, dosage, timeLabel, ACTION_SNOOZE, chainId, doseNumber)
 
         val detail = buildString {
+            if (doseNumber >= 2) append("Prise $doseNumber • ")
             append(name)
             if (dosage.isNotBlank()) append(" — ").append(dosage)
         }
@@ -166,7 +175,9 @@ object NotificationHelper {
         name: String,
         dosage: String,
         timeLabel: String,
-        action: String
+        action: String,
+        chainId: Long = 0L,
+        doseNumber: Int = 1
     ): PendingIntent {
         val i = Intent(ctx, AlarmActionReceiver::class.java).apply {
             this.action = action
@@ -175,6 +186,8 @@ object NotificationHelper {
             putExtra(AlarmScheduler.EXTRA_NAME, name)
             putExtra(AlarmScheduler.EXTRA_DOSAGE, dosage)
             putExtra(AlarmScheduler.EXTRA_TIME_LABEL, timeLabel)
+            putExtra(AlarmScheduler.EXTRA_CHAIN_ID, chainId)
+            putExtra(AlarmScheduler.EXTRA_DOSE_NUMBER, doseNumber)
         }
         val offset = if (action == ACTION_MARK_TAKEN) 1_000_000 else 2_000_000
         return PendingIntent.getBroadcast(

@@ -21,12 +21,17 @@ class PileoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun save(med: Medication, onDone: (Long) -> Unit = {}) {
         viewModelScope.launch {
-            // Si les horaires/jours ont changé, une pause posée sur l'ancien planning n'a plus de sens.
+            // Si les horaires/jours/prises liées ont changé, pause et chaînes en cours
+            // (construites sur l'ancien planning) n'ont plus de sens.
             val toSave = if (med.id != 0L) {
                 val existing = repo.getById(med.id)
                 if (existing != null &&
-                    (existing.timesMinutes != med.timesMinutes || existing.daysOfWeek != med.daysOfWeek)
-                ) med.copy(pausedUntil = 0L) else med
+                    (existing.timesMinutes != med.timesMinutes || existing.daysOfWeek != med.daysOfWeek ||
+                        existing.chainDelaysMinutes != med.chainDelaysMinutes)
+                ) {
+                    clearPendingChains(med.id)
+                    med.copy(pausedUntil = 0L)
+                } else med
             } else med
             val id = repo.upsert(toSave)
             val saved = (if (toSave.id == 0L) toSave.copy(id = id) else toSave)
@@ -42,7 +47,10 @@ class PileoViewModel(app: Application) : AndroidViewModel(app) {
             // Désactiver efface aussi une éventuelle pause (sans objet une fois tout coupé).
             val updated = med.copy(isActive = active, pausedUntil = if (active) med.pausedUntil else 0L)
             repo.update(updated)
-            if (active) scheduler.schedule(updated) else scheduler.cancel(updated.id)
+            if (active) scheduler.schedule(updated) else {
+                clearPendingChains(updated.id)
+                scheduler.cancel(updated.id)
+            }
         }
     }
 
@@ -71,9 +79,45 @@ class PileoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun delete(med: Medication) {
         viewModelScope.launch {
+            clearPendingChains(med.id)
             repo.delete(med)
             scheduler.cancel(med.id)
         }
+    }
+
+    /**
+     * Valide la prochaine prise AVANT l'heure prévue : l'occurrence programmée est
+     * sautée (comme une pause) et la chaîne démarre maintenant (prise 2 = now + 1er délai).
+     * Sans prises liées configurées, ce bouton n'est pas proposé.
+     */
+    fun validateEarly(med: Medication) {
+        viewModelScope.launch {
+            if (!med.isActive || med.chainDelaysMinutes.isEmpty()) return@launch
+            val next = scheduler.nextUpcomingTrigger(med) ?: return@launch
+            val now = System.currentTimeMillis()
+            val firstDelay = med.chainDelaysMinutes.first()
+            val chain = com.pileo.data.ChainedDose(
+                medId = med.id,
+                doseNumber = 2,
+                scheduledAt = now + firstDelay * 60_000L,
+                delayMinutes = firstDelay,
+                name = med.name,
+                dosage = med.dosage
+            )
+            val chainId = repo.insertChain(chain)
+            val updated = med.copy(pausedUntil = next + 60_000L)
+            repo.update(updated)
+            scheduler.cancel(med.id)
+            scheduler.schedule(updated)
+            scheduler.scheduleChain(chain.copy(id = chainId))
+        }
+    }
+
+    /** Supprime les prises liées en attente et annule leurs alarmes. */
+    private suspend fun clearPendingChains(medId: Long) {
+        val pending = repo.pendingChainsForMed(medId)
+        pending.forEach { scheduler.cancelChain(it.id, it.doseNumber) }
+        repo.deleteChainsForMed(medId)
     }
 
     /** Reprogramme toutes les alarmes actives (ouverture de l'app, retour d'autorisation…). */

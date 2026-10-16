@@ -18,6 +18,10 @@ class AlarmScheduler(private val ctx: Context) {
         const val EXTRA_DOSAGE = "dosage"
         const val EXTRA_TIME_LABEL = "timeLabel"
         const val EXTRA_NOTIFICATION_ID = "notificationId"
+        /** Id de la ligne chained_doses (0 = prise à heure programmée). */
+        const val EXTRA_CHAIN_ID = "chainId"
+        /** Numéro de prise affichée (1 = heure programmée, 2..5 = prises liées). */
+        const val EXTRA_DOSE_NUMBER = "doseNumber"
 
         fun requestCode(medId: Long, day: Int, timeIndex: Int): Int {
             return ((medId % 100000L) * 1000L + day * 20L + timeIndex).toInt()
@@ -25,6 +29,14 @@ class AlarmScheduler(private val ctx: Context) {
 
         fun notificationId(medId: Long, day: Int, timeIndex: Int): Int {
             return ((medId % 100000L) * 1000L + 500000L + day * 20L + timeIndex).toInt()
+        }
+
+        /**
+         * Id de notification / requestCode d'une prise liée, dérivé de la ligne en base.
+         * Base haute (1,5 Md) : aucun chevauchement avec les créneaux hebdo (< 101 M).
+         */
+        fun chainNotificationId(chainId: Long, doseNumber: Int): Int {
+            return (1_500_000_000L + (chainId % 50_000_000L) * 10L + doseNumber).toInt()
         }
 
         fun formatTime(minutes: Int): String {
@@ -104,6 +116,52 @@ class AlarmScheduler(private val ctx: Context) {
         meds.forEach { schedule(it) }
     }
 
+    /** Programme une prise liée (one-shot à scheduledAt). */
+    fun scheduleChain(chain: com.pileo.data.ChainedDose) {
+        if (chain.id == 0L) return
+        val nid = chainNotificationId(chain.id, chain.doseNumber)
+        val intent = Intent(ctx, MedicationAlarmReceiver::class.java).apply {
+            action = ACTION_REMIND
+            putExtra(EXTRA_MED_ID, chain.medId)
+            putExtra(EXTRA_NAME, chain.name)
+            putExtra(EXTRA_DOSAGE, chain.dosage)
+            putExtra(EXTRA_TIME_LABEL, "")
+            putExtra(EXTRA_NOTIFICATION_ID, nid)
+            putExtra(EXTRA_CHAIN_ID, chain.id)
+            putExtra(EXTRA_DOSE_NUMBER, chain.doseNumber)
+        }
+        val pi = PendingIntent.getBroadcast(
+            ctx,
+            nid,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val am = alarmManager()
+        try {
+            am.setAlarmClock(alarmClockInfo(chain.scheduledAt), pi)
+        } catch (_: SecurityException) {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, chain.scheduledAt, pi)
+        }
+    }
+
+    /** Annule l'alarme d'une prise liée (la ligne en base est gérée à part). */
+    fun cancelChain(chainId: Long, doseNumber: Int) {
+        if (chainId == 0L) return
+        val nid = chainNotificationId(chainId, doseNumber)
+        val am = alarmManager()
+        val intent = Intent(ctx, MedicationAlarmReceiver::class.java).apply {
+            action = ACTION_REMIND
+        }
+        val pi = PendingIntent.getBroadcast(
+            ctx,
+            nid,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        am.cancel(pi)
+        pi.cancel()
+    }
+
     /** Prochain déclenchement programmé pour ce rappel (toutes combinaisons jour × heure), ou null. */
     fun nextUpcomingTrigger(med: Medication): Long? {
         if (!med.isActive || med.timesMinutes.isEmpty() || med.daysOfWeek.isEmpty()) return null
@@ -124,7 +182,9 @@ class AlarmScheduler(private val ctx: Context) {
         dosage: String,
         timeLabel: String,
         delayMinutes: Int,
-        notificationId: Int
+        notificationId: Int,
+        chainId: Long = 0L,
+        doseNumber: Int = 1
     ) {
         val fireAt = System.currentTimeMillis() + delayMinutes * 60_000L
         val intent = Intent(ctx, MedicationAlarmReceiver::class.java).apply {
@@ -134,6 +194,8 @@ class AlarmScheduler(private val ctx: Context) {
             putExtra(EXTRA_DOSAGE, dosage)
             putExtra(EXTRA_TIME_LABEL, if (timeLabel.isBlank()) "reporté +$delayMinutes min" else "$timeLabel • reporté +$delayMinutes min")
             putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+            putExtra(EXTRA_CHAIN_ID, chainId)
+            putExtra(EXTRA_DOSE_NUMBER, doseNumber)
         }
         val pi = PendingIntent.getBroadcast(
             ctx,

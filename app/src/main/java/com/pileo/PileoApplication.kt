@@ -6,7 +6,7 @@ import com.pileo.notification.NotificationHelper
 
 class PileoApplication : Application() {
     val database by lazy { PileoDatabase.getInstance(this) }
-    val repository by lazy { com.pileo.data.MedicationRepository(database.medicationDao()) }
+    val repository by lazy { com.pileo.data.MedicationRepository(database.medicationDao(), database.chainedDoseDao()) }
     val alarmScheduler by lazy { com.pileo.alarm.AlarmScheduler(this) }
 
     override fun onCreate() {

@@ -140,7 +140,8 @@ fun HomeScreen(
                             onClick = { onEdit(med.id) },
                             onToggle = { vm.toggleActive(med, it) },
                             onPauseNext = { vm.pauseNext(med) },
-                            onResume = { vm.resume(med) }
+                            onResume = { vm.resume(med) },
+                            onValidateEarly = { vm.validateEarly(med) }
                         )
                     }
                 }
@@ -155,7 +156,8 @@ private fun MedicationRow(
     onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onPauseNext: () -> Unit,
-    onResume: () -> Unit
+    onResume: () -> Unit,
+    onValidateEarly: () -> Unit
 ) {
     val paused = med.pausedUntil > System.currentTimeMillis()
     var showDisableDialog by remember(med.id) { mutableStateOf(false) }
@@ -183,6 +185,20 @@ private fun MedicationRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.tertiary
                     )
+                }
+                if (med.chainDelaysMinutes.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        formatChainDelays(med.chainDelaysMinutes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // Valider la prise avant l'heure prévue : démarre la chaîne maintenant.
+                    if (med.isActive) {
+                        TextButton(onClick = onValidateEarly) {
+                            Text("Prendre maintenant")
+                        }
+                    }
                 }
             }
             // En pause : le slider passe en jaune avec une lune à gauche (position OFF).
@@ -270,5 +286,24 @@ private fun formatPauseUntil(pausedUntil: Long): String {
         sdf.format(java.util.Date(pausedUntil - 60_000L))
     } catch (_: Exception) {
         ""
+    }
+}
+
+/** Ex. "Prises liées : +4h → +8h" (chaque prise après validation de la précédente). */
+fun formatChainDelays(delays: List<Int>): String {
+    if (delays.isEmpty()) return ""
+    return "Prises liées : " + delays.joinToString(" → ") { "+${formatDuration(it)}" }
+}
+
+private fun formatDuration(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return buildString {
+        if (h > 0) append("${h}h")
+        if (m > 0) {
+            if (isNotEmpty()) append(" ")
+            append("$m min")
+        }
+        if (isEmpty()) append("0 min")
     }
 }
