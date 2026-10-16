@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.pileo.PileoApplication
+import com.pileo.alarm.WatchdogReceiver
+import com.pileo.alarm.rescheduleAllAlarms
 import com.pileo.data.Medication
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -120,10 +122,11 @@ class PileoViewModel(app: Application) : AndroidViewModel(app) {
         repo.deleteChainsForMed(medId)
     }
 
-    /** Reprogramme toutes les alarmes actives (ouverture de l'app, retour d'autorisation…). */
+    /** Reprogramme tout depuis la base locale + arme le passage quotidien (ouverture de l'app…). */
     fun refreshAlarms() {
         viewModelScope.launch {
-            scheduler.scheduleAll(repo.getActiveOnce())
+            rescheduleAllAlarms(getApplication())
+            WatchdogReceiver.scheduleDaily(getApplication())
         }
     }
 

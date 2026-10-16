@@ -15,6 +15,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -93,6 +98,44 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 )
             }
+            Spacer(Modifier.height(8.dp))
+
+            Text("Démarrage automatique", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Pileo relance seul ses rappels après un redémarrage, sans ouvrir l'app. " +
+                    "Sur certains téléphones (Xiaomi…), autorisez aussi le « Démarrage auto ».",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Button(onClick = { openAutoStart(ctx) }) {
+                Text("Autoriser le démarrage auto")
+            }
         }
     }
+}
+
+/** Ouvre si possible l'écran « Démarrage auto » du fabricant, sinon les réglages de l'app. */
+private fun openAutoStart(ctx: android.content.Context) {
+    val candidates = listOf(
+        Intent("miui.intent.action.OP_AUTO_START"),
+        Intent().apply {
+            component = ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.permcenter.autostart.AutoStartManagementActivity"
+            )
+        }
+    )
+    for (i in candidates) {
+        try {
+            ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (_: Exception) { }
+    }
+    try {
+        ctx.startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${ctx.packageName}")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (_: Exception) { }
 }

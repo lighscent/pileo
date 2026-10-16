@@ -3,7 +3,6 @@ package com.pileo.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.pileo.data.PileoDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,9 +20,10 @@ class BootReceiver : BroadcastReceiver() {
             val pending = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val dao = PileoDatabase.getInstance(context).medicationDao()
-                    val active = dao.getActiveOnce()
-                    AlarmScheduler(context).scheduleAll(active)
+                    // Tout est reconstruit depuis la base locale (rappels + prises
+                    // liées), puis le passage quotidien de sécurité est armé.
+                    rescheduleAllAlarms(context)
+                    WatchdogReceiver.scheduleDaily(context)
                 } finally {
                     pending.finish()
                 }
