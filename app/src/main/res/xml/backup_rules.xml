@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sauvegarde auto (API 30 et moins) : les données de santé ne partent
+     jamais dans le cloud. Voir aussi res/xml/backup_rules_v31.xml. -->
+<full-backup-content>
+    <exclude domain="database" path="pileo.db" />
+    <exclude domain="database" path="pileo.db-wal" />
+    <exclude domain="database" path="pileo.db-shm" />
+    <exclude domain="database" path="pileo.db-journal" />
+    <exclude domain="sharedpref" path="pileo_settings.xml" />
+</full-backup-content>
